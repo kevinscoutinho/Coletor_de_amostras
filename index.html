@@ -1,0 +1,1096 @@
+<!doctype html>
+<html lang="pt"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"></head><body style="margin:0">
+<title>Rota das Amostras</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+/* Layout: o espaço ocupa a tela inteira; telemetria discreta nos cantos de cima; jatos e opções num menu que abre pelo botão no canto inferior direito */
+:root {
+  color-scheme: dark;
+  --space: #03050b;
+  --panel: rgba(8, 14, 26, 0.62);
+  --line: rgba(150, 190, 230, 0.18);
+  --ink: #dbe7f5;
+  --dim: #7f93ab;
+  --amber: #ffb547;
+  --cyan: #7fe3ff;
+  --ok: #5df2a0;
+  --bad: #ff6262;
+  --display: "Chakra Petch", "Segoe UI", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+}
+html, body { height: 100%; }
+body { background: var(--space); color: var(--ink); font-family: var(--mono); overflow: hidden; }
+#app { position: fixed; inset: 0; user-select: none; -webkit-user-select: none; touch-action: none; }
+#c { position: absolute; inset: 0; width: 100%; height: 100%; display: block; cursor: crosshair; }
+
+.hud { position: absolute; pointer-events: none; font-size: 12px; font-variant-numeric: tabular-nums; }
+.panel { box-sizing: border-box; background: var(--panel); border: 1px solid var(--line); border-radius: 4px; padding: 9px 11px; }
+.hud.off { display: none; }
+.eyebrow { font-family: var(--display); font-weight: 600; font-size: 10.5px; letter-spacing: .16em; text-transform: uppercase; color: var(--amber); margin: 0 0 8px; }
+
+#tele { top: calc(14px + env(safe-area-inset-top, 0px)); left: max(16px, env(safe-area-inset-left, 0px)); width: 214px; }
+#crit { top: calc(14px + env(safe-area-inset-top, 0px)); right: max(16px, env(safe-area-inset-right, 0px)); width: 224px; }
+.row { display: flex; justify-content: space-between; gap: 10px; padding: 2px 0; }
+.row span:first-child { color: var(--dim); }
+.row b { font-weight: 500; color: var(--cyan); }
+.row b.warn { color: var(--amber); }
+.fuel { margin-top: 8px; }
+.bar { height: 6px; background: rgba(255,255,255,.08); border-radius: 3px; overflow: hidden; margin-top: 4px; }
+.bar i { display: block; height: 100%; width: 100%; background: var(--cyan); transition: background .3s; }
+.crow { display: grid; grid-template-columns: 10px 1fr auto; align-items: center; gap: 8px; padding: 2px 0; }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--bad); box-shadow: 0 0 6px var(--bad); }
+.crow.ok .dot { background: var(--ok); box-shadow: 0 0 6px var(--ok); }
+.crow span { color: var(--dim); }
+.crow em { font-style: normal; color: var(--ink); }
+.crow small { color: var(--dim); font-size: 10px; }
+.ready { margin-top: 8px; padding-top: 7px; border-top: 1px solid var(--line); font-family: var(--display); font-weight: 600; letter-spacing: .1em; font-size: 11px; color: var(--bad); }
+.ready.ok { color: var(--ok); }
+.ready.idle { color: var(--dim); }
+#critFor { color: var(--ink); }
+
+#met { top: calc(12px + env(safe-area-inset-top, 0px)); left: 50%; transform: translateX(-50%); text-align: center; display: flex; gap: 22px; align-items: flex-end; white-space: nowrap; }
+#met .lbl { font-size: 10px; letter-spacing: .2em; color: var(--dim); text-transform: uppercase; }
+#met .big { font-family: var(--display); font-size: 20px; font-weight: 600; letter-spacing: .05em; }
+#met .big em { font-style: normal; color: var(--amber); }
+#toast { top: calc(66px + env(safe-area-inset-top, 0px)); left: 50%; transform: translateX(-50%); max-width: min(520px, 80vw); text-align: center; font-family: var(--display); font-weight: 600; font-size: 14px; letter-spacing: .03em; padding: 8px 14px; border-radius: 4px; background: rgba(40, 20, 4, .8); border: 1px solid rgba(255,181,71,.45); color: var(--amber); opacity: 0; transition: opacity .3s; }
+#toast.show { opacity: 1; }
+#toast.good { background: rgba(4, 36, 22, .82); border-color: rgba(93,242,160,.45); color: var(--ok); }
+
+#menuBtn { bottom: calc(16px + env(safe-area-inset-bottom, 0px)); right: max(16px, env(safe-area-inset-right, 0px)); pointer-events: auto; font-family: var(--display); font-weight: 600; font-size: 13px; letter-spacing: .08em; text-transform: uppercase; padding: 9px 14px; }
+#menuBtn[aria-expanded="true"] { border-color: rgba(255,181,71,.6); color: var(--amber); }
+#drawer { bottom: calc(62px + env(safe-area-inset-bottom, 0px)); right: max(16px, env(safe-area-inset-right, 0px)); width: 226px; pointer-events: auto; display: grid; gap: 10px; background: rgba(8, 14, 26, .9); }
+#drawer[hidden] { display: none; }
+#drawer .eyebrow { margin: 0; }
+.tools { display: grid; gap: 6px; }
+.tools .btn { text-align: left; }
+.keys { display: grid; grid-template-columns: repeat(3, 64px); gap: 6px; }
+.key { appearance: none; border: 1px solid var(--line); background: rgba(10, 18, 32, .82); color: var(--ink); border-radius: 5px; height: 58px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; cursor: pointer; font-family: var(--mono); touch-action: none; transition: background .08s, border-color .08s, box-shadow .08s; }
+.key b { font-family: var(--display); font-size: 18px; font-weight: 700; line-height: 1; }
+.key small { font-size: 9.5px; color: var(--dim); letter-spacing: .02em; }
+.key.on { background: rgba(127, 227, 255, .22); border-color: var(--cyan); box-shadow: 0 0 14px rgba(127,227,255,.35) inset; }
+.key.on small { color: var(--cyan); }
+.key:focus-visible, .btn:focus-visible, .cta:focus-visible, .ghost:focus-visible, .sec:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+.padnote { font-size: 10px; color: var(--dim); line-height: 1.45; margin: 0; }
+
+.btn { appearance: none; border: 1px solid var(--line); background: rgba(10, 18, 32, .82); color: var(--ink); border-radius: 4px; padding: 8px 10px; font-family: var(--mono); font-size: 11px; cursor: pointer; }
+.btn kbd { font-family: var(--display); font-weight: 700; color: var(--amber); margin-right: 4px; }
+.btn[aria-pressed="false"] .st { color: var(--dim); }
+.btn .st { color: var(--amber); }
+
+#labels { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+.plabel { position: absolute; left: 0; top: 0; transform: translate(-50%, 0); text-align: center; white-space: nowrap; text-shadow: 0 1px 3px #000, 0 0 10px #000; will-change: transform; }
+.plabel b { display: block; font-family: var(--display); font-weight: 600; font-size: 13px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink); }
+.plabel span { font-size: 10.5px; color: var(--dim); letter-spacing: .06em; }
+.plabel.tgt span { color: var(--amber); }
+.plabel.done span { color: var(--ok); }
+.plabel.base span { color: var(--cyan); }
+
+#edge { position: absolute; left: 0; top: 0; pointer-events: none; font-family: var(--display); font-weight: 700; color: var(--bad); font-size: 12px; text-align: center; text-shadow: 0 0 8px #000; }
+#edge i { display: block; font-style: normal; font-size: 22px; line-height: 1; }
+
+#overlay[hidden] { display: none; }
+#overlay { position: absolute; inset: 0; display: grid; place-items: center; background: radial-gradient(ellipse at center, rgba(3,5,11,.5), rgba(3,5,11,.88)); padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 16px; overflow-y: auto; }
+.card { max-width: 620px; width: 100%; box-sizing: border-box; background: rgba(8, 14, 26, .92); border: 1px solid var(--line); border-radius: 6px; padding: 26px 28px; }
+.card h1 { font-family: var(--display); font-weight: 700; font-size: clamp(28px, 6vw, 42px); line-height: 1.05; margin: 0 0 6px; letter-spacing: .02em; text-wrap: balance; }
+.card h1 span { color: var(--amber); }
+.card .sub { color: var(--dim); font-size: 12px; letter-spacing: .14em; text-transform: uppercase; margin: 0 0 16px; }
+.card p { line-height: 1.6; font-size: 13px; margin: 0 0 12px; color: var(--ink); }
+.card ul { margin: 0 0 14px; padding-left: 18px; line-height: 1.7; font-size: 12.5px; color: var(--dim); }
+.card ul b { color: var(--ink); font-weight: 500; }
+.formula { margin: 0 0 16px; padding: 10px 14px; border: 1px solid rgba(127,227,255,.18); background: rgba(127,227,255,.05); border-radius: 4px; font-size: 12.5px; line-height: 1.6; color: var(--dim); }
+.formula b { color: var(--cyan); font-weight: 500; }
+.secs { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 6px; margin: 0 0 18px; }
+.sec { appearance: none; text-align: left; border: 1px solid var(--line); background: rgba(255,255,255,.02); color: var(--ink); border-radius: 4px; padding: 9px 11px; cursor: pointer; font-family: var(--mono); display: grid; gap: 2px; }
+.sec b { font-family: var(--display); font-weight: 600; font-size: 14px; letter-spacing: .03em; }
+.sec small { color: var(--dim); font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase; }
+.sec[aria-pressed="true"] { border-color: rgba(255,181,71,.6); background: rgba(255,181,71,.1); }
+.sec[aria-pressed="true"] small { color: var(--amber); }
+.stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 18px; margin: 0 0 20px; font-size: 12.5px; }
+.stats div { display: flex; justify-content: space-between; border-bottom: 1px solid var(--line); padding: 4px 0; gap: 8px; }
+.stats span { color: var(--dim); }
+.acts { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.cta { appearance: none; border: 0; background: var(--amber); color: #1a1004; font-family: var(--display); font-weight: 700; font-size: 15px; letter-spacing: .08em; text-transform: uppercase; padding: 12px 22px; border-radius: 4px; cursor: pointer; }
+.cta:hover { filter: brightness(1.08); }
+.ghost { appearance: none; background: transparent; border: 1px solid rgba(255,181,71,.55); color: var(--amber); font-family: var(--display); font-weight: 600; font-size: 14px; letter-spacing: .06em; text-transform: uppercase; padding: 11px 16px; border-radius: 4px; cursor: pointer; }
+.ghost:hover { background: rgba(255,181,71,.1); }
+
+@media (max-width: 979px), (max-height: 559px) {
+  .hud { font-size: 10.5px; }
+  #tele, #crit { width: calc(50vw - 24px); padding: 7px 9px; }
+  #tele .row.opt { display: none; }
+  #crit .crow small { display: none; }
+  .eyebrow { margin-bottom: 4px; }
+  #met { top: auto; bottom: calc(14px + env(safe-area-inset-bottom, 0px)); left: max(16px, env(safe-area-inset-left, 0px)); transform: none; gap: 14px; text-align: left; }
+  #met .big { font-size: 15px; }
+  #toast { top: auto; bottom: calc(64px + env(safe-area-inset-bottom, 0px)); font-size: 12px; }
+  .keys { grid-template-columns: repeat(3, 52px); gap: 5px; }
+  .key { height: 44px; }
+  .btn { padding: 7px 8px; font-size: 10.5px; }
+  .stats { grid-template-columns: 1fr; }
+  .card { padding: 20px 18px; }
+}
+@media (prefers-reduced-motion: reduce) { #toast { transition: none; } }
+</style>
+
+<div id="app">
+  <canvas id="c" aria-label="Campo de jogo: nave e planetas"></canvas>
+  <div id="labels"></div>
+
+  <div id="tele" class="hud panel">
+    <p class="eyebrow">Telemetria</p>
+    <div class="row"><span>Velocidade</span><b id="tV">0,00 m/s</b></div>
+    <div class="row"><span>Altitude</span><b id="tAlt">–</b></div>
+    <div class="row opt"><span>Vel. radial</span><b id="tVr">–</b></div>
+    <div class="row opt"><span>Vel. tangencial</span><b id="tVt">–</b></div>
+    <div class="row opt"><span>Inclinação local</span><b id="tTilt">–</b></div>
+    <div class="row opt"><span>Rotação</span><b id="tW">+0 °/s</b></div>
+    <div class="row"><span>Gravidade</span><b id="tG">0,00 m/s²</b></div>
+    <div class="row opt"><span>Campo de</span><b id="tGsrc">nenhum</b></div>
+    <div class="fuel"><div class="row"><span>Ar comprimido</span><b id="tF">100%</b></div><div class="bar"><i id="fBar"></i></div></div>
+  </div>
+
+  <div id="crit" class="hud panel">
+    <p class="eyebrow">Pouso em <span id="critFor">–</span></p>
+    <div class="crow" id="c1"><i class="dot"></i><span>Descida <small>≤ 2,5 m/s</small></span><em id="v1">–</em></div>
+    <div class="crow" id="c2"><i class="dot"></i><span>Deriva <small>≤ 1,5 m/s</small></span><em id="v2">–</em></div>
+    <div class="crow" id="c3"><i class="dot"></i><span>Inclinação <small>± 10°</small></span><em id="v3">–</em></div>
+    <div class="crow" id="c4"><i class="dot"></i><span>Rotação <small>≤ 15 °/s</small></span><em id="v4">–</em></div>
+    <div class="ready" id="ready">–</div>
+  </div>
+
+  <div id="met" class="hud">
+    <div><div class="lbl" id="mSector">Setor 1</div><div class="big" id="mName">–</div></div>
+    <div><div class="lbl">Amostras</div><div class="big" id="mSamples">0/0</div></div>
+    <div><div class="lbl">Tempo</div><div class="big" id="mClock">00:00</div></div>
+  </div>
+  <div id="toast" class="hud" role="status" aria-live="polite"></div>
+
+  <button class="hud btn" id="menuBtn" aria-expanded="false" aria-controls="drawer">☰ Menu</button>
+  <div id="drawer" class="hud panel" hidden>
+    <p class="eyebrow">Jatos</p>
+    <div class="keys">
+      <button class="key" data-jet="ccw" aria-label="Q: girar anti-horário"><b>Q</b><small>gira ↺</small></button>
+      <button class="key" data-jet="top" aria-label="W: jato no topo, empurra para baixo"><b>W</b><small>jato ▴</small></button>
+      <button class="key" data-jet="cw" aria-label="E: girar horário"><b>E</b><small>gira ↻</small></button>
+      <button class="key" data-jet="left" aria-label="A: jato à esquerda, empurra para a direita"><b>A</b><small>jato ◂</small></button>
+      <button class="key" data-jet="bottom" aria-label="S: jato na base, empurra para cima"><b>S</b><small>jato ▾</small></button>
+      <button class="key" data-jet="right" aria-label="D: jato à direita, empurra para a esquerda"><b>D</b><small>jato ▸</small></button>
+    </div>
+    <p class="padnote">O empuxo é sempre oposto ao jato: S (base) empurra a nave para onde o nariz aponta. Também dá para tocar em volta da nave para disparar o jato daquele lado.</p>
+    <p class="eyebrow">Opções</p>
+    <div class="tools">
+      <button class="btn" id="bAssist" aria-pressed="true"><kbd>T</kbd>Trajetória: <span class="st" id="assistSt">ligada</span></button>
+      <button class="btn" id="bPanels" aria-pressed="true"><kbd>H</kbd>Painéis: <span class="st" id="panelsSt">visíveis</span></button>
+      <button class="btn" id="bSound" aria-pressed="true"><kbd>M</kbd>Som: <span class="st" id="soundSt">ligado</span></button>
+      <button class="btn" id="bPause"><kbd>P</kbd>Pausa</button>
+      <button class="btn" id="bReset"><kbd>R</kbd>Reiniciar setor</button>
+      <button class="btn" id="bMenu"><kbd>Esc</kbd>Setores</button>
+    </div>
+  </div>
+
+  <div id="overlay"><div class="card" id="card"></div></div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(() => {
+'use strict';
+// ================================================================ constantes de jogo
+// unidades: 1 unidade de mundo = 1 m; campo visível = 160 × 100 m
+const ACC = 5.0;                   // m/s² de cada par de jatos de translação
+const ANG = 90 * Math.PI / 180;    // rad/s² do par de rotação
+const FUEL_T = 1.8, FUEL_R = 0.7;  // %/s de ar comprimido
+const EXH_V = 15;                  // m/s do gás expelido
+const CRASH_V = 6.0;               // impacto destrutivo em qualquer ponto
+const HULL_CRASH = 3.2;            // impacto destrutivo no casco (fora dos pés)
+const DRILL_T = 2.5;               // s de coleta parado no solo
+const LOST_D = 28;                 // m fora do campo até perder a nave
+const LIM = { vr: 2.5, vt: 1.5, tilt: 10, w: 15 };
+const RANGE = 3;                   // alcance = 1,5 × diâmetro = 3 raios
+const FW = 160, FH = 100, FIT_W = 164, FIT_H = 103;   // área que sempre cabe na tela
+const VIEW = { hw: 90, hh: 52 };                       // meia-largura e meia-altura visíveis (m), recalculadas no resize
+const SC = 1.7;                     // escala da nave (altura ≈ 8,7 m)
+const FOOT = 2.5 * SC;             // distância do centro de massa à sola dos pés
+const I_SHIP = 2.4 * SC * SC;      // momento de inércia / massa (m²)
+// bocais [x, y, dirx, diry] no referencial da nave (nariz = +y). O gás sai em dir; o empuxo é -dir.
+const NOZ = {
+  top:    [[-0.7, 1.15, 0, 1], [0.7, 1.15, 0, 1]],
+  bottom: [[-0.45, -1.8, 0, -1], [0.45, -1.8, 0, -1]],
+  left:   [[-0.9, 0.6, -1, 0], [-0.9, -0.9, -1, 0]],
+  right:  [[0.9, 0.6, 1, 0], [0.9, -0.9, 1, 0]],
+  ccw:    [[0.9, 1.0, 1, 0], [-0.9, -1.3, -1, 0]],
+  cw:     [[-0.9, 1.0, -1, 0], [0.9, -1.3, 1, 0]],
+};
+// pontos de contato do casco; os dois primeiros são os pés
+const HULL = [[-1.35, -2.5], [1.35, -2.5], [-0.85, -1.6], [0.85, -1.6], [-0.85, 0], [0.85, 0], [-0.85, 1.1], [0.85, 1.1], [0, 2.6], [-0.45, 2.0], [0.45, 2.0]];
+for (const k in NOZ) for (const n of NOZ[k]) { n[0] *= SC; n[1] *= SC; }
+for (const h of HULL) { h[0] *= SC; h[1] *= SC; }
+const KEYMAP = { KeyD: 'right', KeyA: 'left', KeyW: 'top', KeyS: 'bottom', KeyQ: 'ccw', KeyE: 'cw' };
+const TYPES = {
+  base:   { atm: 0x8fb6ff, dust: [0.30, 0.34, 0.40] },
+  rocky:  { atm: 0xb8c0cc, dust: [0.40, 0.36, 0.32] },
+  ice:    { atm: 0xbfe6ff, dust: [0.55, 0.62, 0.70] },
+  desert: { atm: 0xffcf8a, dust: [0.60, 0.42, 0.22] },
+  jungle: { atm: 0x7fd0ff, dust: [0.30, 0.38, 0.24] },
+  lava:   { atm: 0xff7a3a, dust: [0.55, 0.25, 0.10] },
+};
+const LEVELS = [
+  { name: 'Primeiro salto', desc: 'Dois mundos calmos e distantes. Decole, cruze o vazio e freie antes de descer.', start: 90, planets: [
+    { n: 'Origem', type: 'base', x: -48, y: -18, R: 7, g: 1.6, base: true },
+    { n: 'Duna', type: 'desert', x: 42, y: 14, R: 10, g: 2.2 },
+  ] },
+  { name: 'O esboço', desc: 'Quatro planetas, um deles maior. Atravesse os campos sem cair no planeta errado.', start: 90, planets: [
+    { n: 'Origem', type: 'base', x: -14, y: -28, R: 7, g: 1.8, base: true },
+    { n: 'Geada', type: 'ice', x: -48, y: 19, R: 10, g: 2.6 },
+    { n: 'Verdejante', type: 'jungle', x: 26, y: 19, R: 10, g: 2.4 },
+    { n: 'Brasa', type: 'lava', x: 44, y: -14, R: 12, g: 3.2 },
+  ] },
+  { name: 'Par binário', desc: 'Halo e Cinza estão próximos: onde os campos se sobrepõem, as duas gravidades se somam.', start: 60, planets: [
+    { n: 'Origem', type: 'base', x: -58, y: -28, R: 7, g: 1.6, base: true },
+    { n: 'Halo', type: 'ice', x: -8, y: 6, R: 12, g: 3.0 },
+    { n: 'Cinza', type: 'rocky', x: 24, y: -14, R: 8, g: 2.0 },
+    { n: 'Ocre', type: 'desert', x: 52, y: 22, R: 9, g: 2.4 },
+  ] },
+  { name: 'O gigante', desc: 'Titã puxa com 3,8 m/s². Decolar de lá consome quase todo o empuxo.', start: 45, planets: [
+    { n: 'Origem', type: 'base', x: -59, y: -28, R: 7, g: 1.6, base: true },
+    { n: 'Titã', type: 'lava', x: 0, y: 0, R: 15, g: 3.8 },
+    { n: 'Floco', type: 'ice', x: -56, y: 31, R: 6, g: 1.4 },
+    { n: 'Musgo', type: 'jungle', x: 57, y: 29, R: 7, g: 1.8 },
+    { n: 'Âmbar', type: 'desert', x: 56, y: -26, R: 8, g: 2.2 },
+  ] },
+  { name: 'Arquipélago', desc: 'Cinco alvos com campos entrelaçados. Use a gravidade a seu favor para economizar ar.', start: 0, planets: [
+    { n: 'Origem', type: 'base', x: -59, y: 0, R: 7, g: 1.6, base: true },
+    { n: 'Coral', type: 'jungle', x: -30, y: 26, R: 8, g: 2.2 },
+    { n: 'Basalto', type: 'rocky', x: -24, y: -23, R: 9, g: 2.6 },
+    { n: 'Núcleo', type: 'lava', x: 10, y: 4, R: 10, g: 3.0 },
+    { n: 'Cristal', type: 'ice', x: 46, y: -26, R: 8, g: 2.2 },
+    { n: 'Areia', type: 'desert', x: 47, y: 17, R: 11, g: 3.2 },
+  ] },
+];
+const deg = r => r * 180 / Math.PI;
+const wrap = a => { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a; };
+const fmt = (v, d, sign) => (sign && v >= 0 ? '+' : '') + v.toFixed(d).replace('.', ',').replace('-', '−');
+const clamp01 = v => v < 0 ? 0 : v > 1 ? 1 : v;
+const $ = id => document.getElementById(id);
+
+// ================================================================ renderer e cena
+const canvas = $('c');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+renderer.outputEncoding = THREE.sRGBEncoding;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.05;
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x03050b);
+const FOV = 30;
+const camera = new THREE.PerspectiveCamera(FOV, 1, 1, 4000);
+const camBase = { x: 0, y: 0, z: 300 };
+
+const sun = new THREE.DirectionalLight(0xfff1dc, 2.5);
+sun.position.set(-70, 55, 90);
+scene.add(sun);
+scene.add(new THREE.AmbientLight(0x3a4560, 0.4));
+scene.add(new THREE.HemisphereLight(0x223355, 0x0a0a12, 0.3));
+
+function canvasTex(w, h, draw, srgb = true) {
+  const c = document.createElement('canvas'); c.width = w; c.height = h;
+  draw(c.getContext('2d'), w, h);
+  const t = new THREE.CanvasTexture(c); if (srgb) t.encoding = THREE.sRGBEncoding;
+  return t;
+}
+const dotTex = canvasTex(64, 64, (g, w) => {
+  const r = g.createRadialGradient(w / 2, w / 2, 0, w / 2, w / 2, w / 2);
+  r.addColorStop(0, 'rgba(255,255,255,1)'); r.addColorStop(0.35, 'rgba(255,255,255,.7)'); r.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = r; g.fillRect(0, 0, w, w);
+});
+const haloTex = canvasTex(256, 256, (g, w) => {
+  const r = g.createRadialGradient(w / 2, w / 2, 0, w / 2, w / 2, w / 2);
+  r.addColorStop(0, 'rgba(255,255,255,0)'); r.addColorStop(0.70, 'rgba(255,255,255,0)');
+  r.addColorStop(0.745, 'rgba(255,255,255,.75)'); r.addColorStop(0.80, 'rgba(255,255,255,.28)'); r.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = r; g.fillRect(0, 0, w, w);
+});
+// campo gravitacional: brilho que cai com 1/r² entre a superfície (r = R) e o alcance (r = 3R)
+const fieldTex = canvasTex(256, 256, (g, w) => {
+  const img = g.createImageData(w, w), d = img.data;
+  for (let y = 0; y < w; y++) for (let x = 0; x < w; x++) {
+    const rho = Math.hypot(x + 0.5 - w / 2, y + 0.5 - w / 2) / (w / 2);
+    let a = 0;
+    if (rho <= 1 && rho >= 1 / 3) a = 0.17 / Math.pow(3 * rho, 2);
+    if (rho > 0.985 && rho <= 1) a += 0.05;
+    const i = (y * w + x) * 4; d[i] = d[i + 1] = d[i + 2] = 255; d[i + 3] = Math.round(a * 255);
+  }
+  g.putImageData(img, 0, 0);
+});
+
+// ---------------------------------------------------------------- estrelas e nebulosa
+function rng(seed) { let s = seed >>> 0; return () => { s = (s + 0x6D2B79F5) >>> 0; let t = s; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+function starLayer(n, z, spread, size, seed) {
+  const R = rng(seed), pos = new Float32Array(n * 3), col = new Float32Array(n * 3);
+  const tints = [[1, 1, 1], [0.75, 0.85, 1], [1, 0.9, 0.75], [0.85, 0.95, 1]];
+  for (let i = 0; i < n; i++) {
+    pos[i * 3] = (R() - 0.5) * spread * 2.4; pos[i * 3 + 1] = (R() - 0.5) * spread; pos[i * 3 + 2] = z - R() * 60;
+    const t = tints[(R() * tints.length) | 0], b = 0.25 + 0.75 * Math.pow(R(), 2.2);
+    col[i * 3] = t[0] * b; col[i * 3 + 1] = t[1] * b; col[i * 3 + 2] = t[2] * b;
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  scene.add(new THREE.Points(g, new THREE.PointsMaterial({ size, map: dotTex, vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })));
+}
+starLayer(900, -120, 420, 1.1, 7);
+starLayer(1400, -380, 760, 2.0, 11);
+starLayer(1800, -760, 1200, 3.2, 13);
+{
+  const neb = canvasTex(1024, 512, (g, w, h) => {
+    g.fillStyle = '#000'; g.fillRect(0, 0, w, h);
+    const blobs = [[0.22, 0.30, 0.38, '60,40,120'], [0.70, 0.62, 0.42, '20,70,110'], [0.48, 0.85, 0.30, '110,40,70'], [0.86, 0.20, 0.26, '30,60,90']];
+    g.globalCompositeOperation = 'lighter';
+    for (const [x, y, r, c] of blobs) {
+      const gr = g.createRadialGradient(x * w, y * h, 0, x * w, y * h, r * w);
+      gr.addColorStop(0, `rgba(${c},.22)`); gr.addColorStop(1, `rgba(${c},0)`);
+      g.fillStyle = gr; g.fillRect(0, 0, w, h);
+    }
+  });
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(3200, 1600), new THREE.MeshBasicMaterial({ map: neb, depthWrite: false }));
+  m.position.z = -900; scene.add(m);
+}
+// ================================================================ texturas procedurais dos planetas
+function hash3(x, y, z, s) {
+  let h = Math.imul(x, 374761393) ^ Math.imul(y, 668265263) ^ Math.imul(z, 1274126177) ^ Math.imul(s, 2246822519);
+  h = Math.imul(h ^ (h >>> 13), 1274126177); h ^= h >>> 16; return (h >>> 0) / 4294967296;
+}
+function vnoise(x, y, z, s) {
+  const X = Math.floor(x), Y = Math.floor(y), Z = Math.floor(z);
+  const fx = x - X, fy = y - Y, fz = z - Z;
+  const u = fx * fx * (3 - 2 * fx), v = fy * fy * (3 - 2 * fy), w = fz * fz * (3 - 2 * fz);
+  const a = hash3(X, Y, Z, s), b = hash3(X + 1, Y, Z, s), c = hash3(X, Y + 1, Z, s), d = hash3(X + 1, Y + 1, Z, s);
+  const e = hash3(X, Y, Z + 1, s), f = hash3(X + 1, Y, Z + 1, s), g = hash3(X, Y + 1, Z + 1, s), h = hash3(X + 1, Y + 1, Z + 1, s);
+  const x1 = a + (b - a) * u, x2 = c + (d - c) * u, x3 = e + (f - e) * u, x4 = g + (h - g) * u;
+  const y1 = x1 + (x2 - x1) * v, y2 = x3 + (x4 - x3) * v; return y1 + (y2 - y1) * w;
+}
+function fbm(x, y, z, s, oct) { let a = 0.5, f = 1, sum = 0, norm = 0; for (let i = 0; i < oct; i++) { sum += a * vnoise(x * f, y * f, z * f, s + i * 17); norm += a; f *= 2.03; a *= 0.5; } return sum / norm; }
+const mix = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
+
+function planetTextures(type, seed) {
+  const W = 256, H = 128, R = rng(seed);
+  const cMap = document.createElement('canvas'); cMap.width = W; cMap.height = H;
+  const img = cMap.getContext('2d').createImageData(W, H), d = img.data;
+  let eImg = null, cEm = null;
+  if (type === 'lava') { cEm = document.createElement('canvas'); cEm.width = W; cEm.height = H; eImg = cEm.getContext('2d').createImageData(W, H); }
+  const craters = [];
+  if (type === 'rocky' || type === 'base' || type === 'ice') for (let i = 0; i < (type === 'ice' ? 10 : 28); i++) {
+    const zz = R() * 2 - 1, t = R() * Math.PI * 2, q = Math.sqrt(1 - zz * zz);
+    craters.push([q * Math.cos(t), zz, q * Math.sin(t), 0.05 + Math.pow(R(), 2) * 0.28]);
+  }
+  for (let y = 0; y < H; y++) {
+    const lat = (0.5 - (y + 0.5) / H) * Math.PI, cl = Math.cos(lat), py = Math.sin(lat);
+    for (let x = 0; x < W; x++) {
+      const lon = (x + 0.5) / W * Math.PI * 2, px = cl * Math.cos(lon), pz = cl * Math.sin(lon);
+      let n = fbm(px * 2.1 + 5, py * 2.1, pz * 2.1, seed, 5); n = clamp01((n - 0.5) * 1.9 + 0.5);
+      const n2 = fbm(px * 6 + 9, py * 6, pz * 6, seed + 99, 4);
+      let col, em = null;
+      if (type === 'rocky') col = mix([92, 84, 78], [176, 162, 146], n * 0.8 + n2 * 0.2);
+      else if (type === 'base') col = mix([66, 78, 98], [150, 164, 186], n * 0.8 + n2 * 0.2);
+      else if (type === 'ice') {
+        col = mix([168, 196, 220], [244, 250, 255], n);
+        if (Math.abs(n2 - 0.5) < 0.016) col = mix(col, [70, 120, 175], 0.8);
+      } else if (type === 'desert') {
+        const band = 0.5 + 0.5 * Math.sin(lat * 9 + n * 7);
+        col = mix([168, 108, 54], [236, 194, 124], band * 0.55 + n * 0.45);
+      } else if (type === 'jungle') {
+        if (n < 0.5) col = mix([14, 40, 96], [34, 96, 168], n * 2);
+        else if (n > 0.72) col = mix([110, 96, 66], [150, 136, 104], n2);
+        else col = mix([38, 104, 52], [104, 132, 62], n2);
+        if (Math.abs(lat) > 1.22) col = [232, 240, 248];
+        const cl2 = fbm(px * 3 + 20, py * 4.5, pz * 3, seed + 7, 4);
+        if (cl2 > 0.55) col = mix(col, [245, 248, 252], Math.min(0.85, (cl2 - 0.55) * 4));
+      } else if (type === 'lava') {
+        col = mix([30, 24, 24], [74, 60, 54], n);
+        const k = Math.abs(n2 - 0.5); let glow = k < 0.04 ? 1 - k / 0.04 : 0;
+        if (n < 0.28) glow = Math.max(glow, (0.28 - n) / 0.28 * 0.9);
+        col = mix(col, [255, 130, 40], glow * 0.85);
+        em = [255 * glow, 90 * glow, 20 * glow];
+      }
+      for (const [cx, cy, cz, cs] of craters) {
+        const ang = Math.acos(Math.max(-1, Math.min(1, px * cx + py * cy + pz * cz)));
+        if (ang < cs * 1.25) { const t = ang / cs; const f = t < 1 ? 0.72 + 0.18 * t * t : 1.14; col = [col[0] * f, col[1] * f, col[2] * f]; }
+      }
+      const i = (y * W + x) * 4;
+      d[i] = Math.min(255, col[0]); d[i + 1] = Math.min(255, col[1]); d[i + 2] = Math.min(255, col[2]); d[i + 3] = 255;
+      if (eImg) { eImg.data[i] = em[0]; eImg.data[i + 1] = em[1]; eImg.data[i + 2] = em[2]; eImg.data[i + 3] = 255; }
+    }
+  }
+  cMap.getContext('2d').putImageData(img, 0, 0);
+  const map = new THREE.CanvasTexture(cMap); map.encoding = THREE.sRGBEncoding; map.anisotropy = 4;
+  let emissive = null;
+  if (cEm) { cEm.getContext('2d').putImageData(eImg, 0, 0); emissive = new THREE.CanvasTexture(cEm); emissive.encoding = THREE.sRGBEncoding; }
+  return { map, emissive };
+}
+
+// ================================================================ nave
+const std = (color, rough = 0.5, metal = 0.2, extra = {}) => new THREE.MeshStandardMaterial(Object.assign({ color, roughness: rough, metalness: metal }, extra));
+function buildShip() {
+  const g = new THREE.Group();
+  const blue = std(0x3f95ea, 0.4, 0.3), blueD = std(0x2462a8, 0.45, 0.3, { side: THREE.DoubleSide }), white = std(0xe9eef4, 0.5, 0.15), dark = std(0x2a3340, 0.6, 0.4), metal = std(0x9aa6b4, 0.35, 0.8);
+  const add = (geo, mat, x, y, z = 0, rz = 0) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.rotation.z = rz; g.add(m); return m; };
+  add(new THREE.CylinderGeometry(0.85, 0.85, 2.8, 28), blue, 0, -0.2);
+  add(new THREE.ConeGeometry(0.85, 1.4, 28), white, 0, 1.9);
+  add(new THREE.CylinderGeometry(0.9, 0.9, 0.18, 28), white, 0, 1.15);
+  add(new THREE.CylinderGeometry(0.9, 0.9, 0.22, 28), dark, 0, -1.5);
+  add(new THREE.CylinderGeometry(0.9, 0.9, 0.08, 28), white, 0, 0.0);
+  const win = add(new THREE.SphereGeometry(0.34, 18, 12), std(0x0e2233, 0.15, 0.6, { emissive: 0x1d6fa0, emissiveIntensity: 0.7 }), 0, 0.55, 0.72);
+  win.scale.z = 0.45;
+  for (const sg of [1, -1]) {
+    const sh = new THREE.Shape(); sh.moveTo(sg * 0.8, -0.35); sh.lineTo(sg * 1.55, -1.6); sh.lineTo(sg * 0.8, -1.6); sh.lineTo(sg * 0.8, -0.35);
+    const fg = new THREE.ExtrudeGeometry(sh, { depth: 0.14, bevelEnabled: false }); fg.translate(0, 0, -0.07);
+    g.add(new THREE.Mesh(fg, blueD));
+    // perna: do casco ao pé
+    const x0 = sg * 0.7, y0 = -1.3, x1 = sg * 1.35, y1 = -2.42, vx = x1 - x0, vy = y1 - y0, L = Math.hypot(vx, vy);
+    add(new THREE.CylinderGeometry(0.07, 0.07, L, 8), metal, (x0 + x1) / 2, (y0 + y1) / 2, 0.3, Math.atan2(-vx, vy));
+    add(new THREE.CylinderGeometry(0.07, 0.07, L, 8), metal, (x0 + x1) / 2, (y0 + y1) / 2, -0.3, Math.atan2(-vx, vy));
+    add(new THREE.CylinderGeometry(0.26, 0.32, 0.1, 14), dark, x1, -2.45);
+  }
+  for (const [key, list] of Object.entries(NOZ)) {
+    if (key === 'ccw' || key === 'cw') continue;
+    for (const [x, y, dx, dy] of list) {
+      const big = key === 'bottom';
+      const cone = new THREE.Mesh(new THREE.CylinderGeometry(big ? 0.14 : 0.08, big ? 0.24 : 0.13, big ? 0.32 : 0.2, 12, 1, true), metal);
+      cone.position.set(x - dx * 0.05, y - dy * 0.05, 0); cone.rotation.z = Math.atan2(dx, -dy); // boca do bocal aponta em (dx,dy)
+      cone.material.side = THREE.DoubleSide; g.add(cone);
+    }
+  }
+  return g;
+}
+const ship = new THREE.Group();
+{ const inner = buildShip(); inner.scale.setScalar(SC); ship.add(inner); }
+scene.add(ship);
+
+// marcador de pouso: bandeira
+const flagGroup = new THREE.Group(); scene.add(flagGroup);
+const poleGeo = new THREE.CylinderGeometry(0.06, 0.06, 2.4, 6), flagGeo = new THREE.PlaneGeometry(1.1, 0.65);
+const poleMat = std(0xcfd6de, 0.4, 0.6), flagMat = std(0xffb547, 0.6, 0.0, { side: THREE.DoubleSide, emissive: 0x6a3a00, emissiveIntensity: 0.6 });
+function plantFlag(p, a) {
+  const grp = new THREE.Group();
+  const pole = new THREE.Mesh(poleGeo, poleMat); pole.position.y = 1.2; grp.add(pole);
+  const fl = new THREE.Mesh(flagGeo, flagMat); fl.position.set(0.55, 2.05, 0); grp.add(fl);
+  grp.position.set(p.x + Math.cos(a) * (p.R - 0.05), p.y + Math.sin(a) * (p.R - 0.05), 0.2);
+  grp.rotation.z = a - Math.PI / 2; grp.scale.setScalar(1.4); flagGroup.add(grp);
+}
+
+// ================================================================ planetas (por setor)
+const levelGroup = new THREE.Group(); scene.add(levelGroup);
+const labelsEl = $('labels');
+let planets = [];
+function disposeTree(o) {
+  o.traverse(n => { if (n.geometry) n.geometry.dispose(); if (n.material) { const ms = Array.isArray(n.material) ? n.material : [n.material]; for (const m of ms) { if (m.map && m.map !== haloTex && m.map !== fieldTex) m.map.dispose(); if (m.emissiveMap) m.emissiveMap.dispose(); m.dispose(); } } });
+}
+function buildLevel(li) {
+  for (const c of [...levelGroup.children]) { disposeTree(c); levelGroup.remove(c); }
+  labelsEl.textContent = '';
+  planets = LEVELS[li].planets.map((d, i) => {
+    const p = Object.assign({}, d, { GM: d.g * d.R * d.R, idx: i });
+    const tex = planetTextures(d.type, 1000 + li * 37 + i * 101);
+    const atm = TYPES[d.type].atm;
+    const mat = new THREE.MeshStandardMaterial({ map: tex.map, roughness: 0.95, metalness: 0 });
+    if (tex.emissive) { mat.emissive = new THREE.Color(0xffffff); mat.emissiveMap = tex.emissive; mat.emissiveIntensity = 1.3; }
+    p.mesh = new THREE.Mesh(new THREE.SphereGeometry(d.R, 64, 40), mat);
+    p.mesh.position.set(d.x, d.y, 0); p.mesh.rotation.set(0.3, i * 1.7, 0.12); levelGroup.add(p.mesh);
+    p.spin = (i % 2 ? -1 : 1) * (0.03 + 0.02 * (i % 3));
+    const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: haloTex, color: atm, blending: THREE.AdditiveBlending, transparent: true, depthWrite: false, opacity: d.type === 'rocky' || d.type === 'base' ? 0.45 : 0.8 }));
+    halo.scale.setScalar(d.R * 2.7); halo.position.set(d.x, d.y, -0.5); levelGroup.add(halo);
+    p.disc = new THREE.Mesh(new THREE.CircleGeometry(d.R * RANGE, 96), new THREE.MeshBasicMaterial({ map: fieldTex, color: atm, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0.55 }));
+    p.disc.position.set(d.x, d.y, -2); levelGroup.add(p.disc);
+    const rp = []; const RR = d.R * RANGE;
+    for (let k = 0; k <= 160; k++) { const t = k / 160 * Math.PI * 2; rp.push(d.x + Math.cos(t) * RR, d.y + Math.sin(t) * RR, -1.5); }
+    const rg = new THREE.BufferGeometry(); rg.setAttribute('position', new THREE.Float32BufferAttribute(rp, 3));
+    p.ring = new THREE.Line(rg, new THREE.LineDashedMaterial({ color: atm, dashSize: 1.5, gapSize: 1.2, transparent: true, opacity: 0.3, depthWrite: false }));
+    p.ring.computeLineDistances(); levelGroup.add(p.ring);
+    const el = document.createElement('div'); el.className = 'plabel';
+    el.innerHTML = `<b></b><span></span>`; el.firstChild.textContent = d.n; labelsEl.appendChild(el);
+    p.label = el; p.labelSt = el.lastChild; p.labelKey = '';
+    return p;
+  });
+}
+
+// ================================================================ trajetória prevista e vetor da gravidade
+const PRED_N = 260;
+const predGeo = new THREE.BufferGeometry();
+predGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(PRED_N * 3), 3));
+const predLine = new THREE.Line(predGeo, new THREE.LineDashedMaterial({ color: 0xffb547, dashSize: 0.9, gapSize: 0.7, transparent: true, opacity: 0.75, depthWrite: false }));
+predLine.frustumCulled = false; scene.add(predLine);
+const gArrow = new THREE.ArrowHelper(new THREE.Vector3(0, -1, 0), new THREE.Vector3(), 3, 0x7fe3ff, 0.9, 0.6);
+gArrow.line.material.depthTest = false; gArrow.cone.material.depthTest = false; gArrow.renderOrder = 10;
+gArrow.line.material.transparent = true; gArrow.line.material.opacity = 0.9;
+scene.add(gArrow);
+
+// ================================================================ partículas (gás dos jatos, poeira, destroços) — sentem a gravidade
+const PN = 3200;
+const pPos = new Float32Array(PN * 3), pCol = new Float32Array(PN * 3), pVel = new Float32Array(PN * 2);
+const pLife = new Float32Array(PN), pMax = new Float32Array(PN), pBase = new Float32Array(PN * 3), pKind = new Uint8Array(PN), pStuck = new Uint8Array(PN);
+let pHead = 0;
+for (let i = 0; i < PN; i++) pPos[i * 3] = 9999;
+const pGeo = new THREE.BufferGeometry();
+pGeo.setAttribute('position', new THREE.BufferAttribute(pPos, 3));
+pGeo.setAttribute('color', new THREE.BufferAttribute(pCol, 3));
+const pts = new THREE.Points(pGeo, new THREE.PointsMaterial({ size: 0.75, map: dotTex, vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+pts.frustumCulled = false; scene.add(pts);
+function emit(x, y, vx, vy, life, r, g, b, kind) {
+  const i = pHead; pHead = (pHead + 1) % PN;
+  pPos[i * 3] = x; pPos[i * 3 + 1] = y; pPos[i * 3 + 2] = (Math.random() - 0.5) * 0.9;
+  pVel[i * 2] = vx; pVel[i * 2 + 1] = vy; pLife[i] = life; pMax[i] = life;
+  pBase[i * 3] = r; pBase[i * 3 + 1] = g; pBase[i * 3 + 2] = b; pKind[i] = kind; pStuck[i] = 0;
+}
+const gTmp = { ax: 0, ay: 0, src: -1, mag: 0 };
+function gravAt(x, y, out) {
+  let ax = 0, ay = 0, best = 0, src = -1;
+  for (let i = 0; i < planets.length; i++) {
+    const p = planets[i], dx = p.x - x, dy = p.y - y, r2 = dx * dx + dy * dy, r = Math.sqrt(r2);
+    if (r <= p.R * RANGE && r > 1e-3) { const a = p.GM / r2; ax += a * dx / r; ay += a * dy / r; if (a > best) { best = a; src = i; } }
+  }
+  out.ax = ax; out.ay = ay; out.src = src; out.mag = Math.hypot(ax, ay); return out;
+}
+const gP = { ax: 0, ay: 0, src: -1, mag: 0 };
+function updateParticles(dt) {
+  if (dt <= 0) return;
+  for (let i = 0; i < PN; i++) {
+    if (pLife[i] <= 0) continue;
+    pLife[i] -= dt;
+    if (pLife[i] <= 0) { pPos[i * 3] = 9999; pCol[i * 3] = pCol[i * 3 + 1] = pCol[i * 3 + 2] = 0; continue; }
+    if (!pStuck[i]) {
+      let x = pPos[i * 3], y = pPos[i * 3 + 1];
+      gravAt(x, y, gP);
+      pVel[i * 2] += gP.ax * dt; pVel[i * 2 + 1] += gP.ay * dt;
+      if (pKind[i] === 0) { pVel[i * 2] *= 1 - 0.35 * dt; pVel[i * 2 + 1] *= 1 - 0.35 * dt; } // o gás se espalha e perde coerência
+      x += pVel[i * 2] * dt; y += pVel[i * 2 + 1] * dt;
+      for (const p of planets) {
+        const dx = x - p.x, dy = y - p.y, d = Math.hypot(dx, dy);
+        if (d < p.R) {
+          if (pKind[i] === 0) {   // gás bate no chão e escorre pela superfície
+            const nx = dx / d, ny = dy / d, vn = pVel[i * 2] * nx + pVel[i * 2 + 1] * ny;
+            pVel[i * 2] -= 1.6 * vn * nx; pVel[i * 2 + 1] -= 1.6 * vn * ny; pVel[i * 2] *= 0.6; pVel[i * 2 + 1] *= 0.6;
+          } else { pStuck[i] = 1; pLife[i] = Math.min(pLife[i], 1.2); }
+          x = p.x + dx / d * (p.R + 0.05); y = p.y + dy / d * (p.R + 0.05);
+        }
+      }
+      pPos[i * 3] = x; pPos[i * 3 + 1] = y;
+    }
+    const k = pLife[i] / pMax[i], f = pKind[i] === 0 ? k * k : k;
+    pCol[i * 3] = pBase[i * 3] * f; pCol[i * 3 + 1] = pBase[i * 3 + 1] * f; pCol[i * 3 + 2] = pBase[i * 3 + 2] * f;
+  }
+  pGeo.attributes.position.needsUpdate = true; pGeo.attributes.color.needsUpdate = true;
+}
+const flash = new THREE.Sprite(new THREE.SpriteMaterial({ map: dotTex, color: 0xffa040, blending: THREE.AdditiveBlending, transparent: true, depthWrite: false, opacity: 0 }));
+scene.add(flash);
+let flashT = 0;
+
+// ================================================================ estado
+const S = { x: 0, y: 0, vx: 0, vy: 0, th: 0, w: 0, fuel: 100, landed: -1, landAng: 0, drill: 0, noLand: 0, t: 0, started: false, active: new Set(), sampled: new Set(), fuelUsed: 0, landings: 0, crashMsg: '' };
+let state = 'intro', paused = false, muted = false, assist = true, levelIdx = 0, selIdx = 0, endTimer = 0, builtLevel = -1;
+const input = { keys: new Set(), pad: new Set(), pointer: null };
+const targetsOf = () => planets.filter(p => !p.base);
+
+function resetLevel(li) {
+  levelIdx = li;
+  if (builtLevel !== li) { buildLevel(li); builtLevel = li; }
+  for (const c of [...flagGroup.children]) flagGroup.remove(c);
+  const lv = LEVELS[li], base = planets.find(p => p.base);
+  Object.assign(S, { vx: 0, vy: 0, w: 0, fuel: 100, landed: base.idx, landAng: lv.start * Math.PI / 180, drill: 0, noLand: 0, t: 0, started: false, fuelUsed: 0, landings: 0, crashMsg: '' });
+  S.sampled = new Set(); S.active = new Set();
+  S.x = base.x + Math.cos(S.landAng) * (base.R + FOOT); S.y = base.y + Math.sin(S.landAng) * (base.R + FOOT); S.th = S.landAng - Math.PI / 2;
+  for (let i = 0; i < PN; i++) { pLife[i] = 0; pPos[i * 3] = 9999; pCol[i * 3] = pCol[i * 3 + 1] = pCol[i * 3 + 2] = 0; }
+  ship.visible = true; flashT = 0; endTimer = 0;
+  lastToast = ''; resize();
+}
+
+function activeJets() {
+  const a = new Set();
+  for (const k of input.keys) if (KEYMAP[k]) a.add(KEYMAP[k]);
+  for (const j of input.pad) a.add(j);
+  if (input.pointer && input.pointer.jet) a.add(input.pointer.jet);
+  return a;
+}
+function thrustWorld(jets) {
+  const fx = (jets.has('left') ? 1 : 0) - (jets.has('right') ? 1 : 0);   // jato à direita → empuxo para a esquerda
+  const fy = (jets.has('bottom') ? 1 : 0) - (jets.has('top') ? 1 : 0);   // jato na base → empuxo para o nariz
+  const c = Math.cos(S.th), s = Math.sin(S.th);
+  return [(fx * c - fy * s) * ACC, (fx * s + fy * c) * ACC];
+}
+function nearestPlanet(x, y) {
+  let best = null, bd = Infinity;
+  for (const p of planets) { const d = Math.hypot(x - p.x, y - p.y) - p.R; if (d < bd) { bd = d; best = p; } }
+  return best;
+}
+function landingState(p) {
+  const dx = S.x - p.x, dy = S.y - p.y, d = Math.hypot(dx, dy), nx = dx / d, ny = dy / d;
+  const vr = S.vx * nx + S.vy * ny, vt = -S.vx * ny + S.vy * nx;
+  const ux = -Math.sin(S.th), uy = Math.cos(S.th);
+  const tilt = deg(Math.atan2(nx * uy - ny * ux, ux * nx + uy * ny));
+  const wd = deg(S.w), alt = d - p.R - FOOT;
+  const ok1 = -vr <= LIM.vr, ok2 = Math.abs(vt) <= LIM.vt, ok3 = Math.abs(tilt) <= LIM.tilt, ok4 = Math.abs(wd) <= LIM.w;
+  return { p, vr, vt, tilt, w: wd, alt, ok1, ok2, ok3, ok4, ok: ok1 && ok2 && ok3 && ok4 };
+}
+
+// ---------------------------------------------------------------- passo de física
+const gS = { ax: 0, ay: 0, src: -1, mag: 0 };
+let emitAcc = 0, dustAcc = 0;
+function emitJets(jets, h) {
+  if (!jets.size) return;
+  emitAcc += h * 170;
+  const n = Math.floor(emitAcc); emitAcc -= n;
+  if (!n) return;
+  const c = Math.cos(S.th), s = Math.sin(S.th);
+  for (const j of jets) for (const [bx, by, dx, dy] of NOZ[j]) for (let k = 0; k < n; k++) {
+    const rx = bx * c - by * s, ry = bx * s + by * c, wx = dx * c - dy * s, wy = dx * s + dy * c;
+    const sp = EXH_V * (0.65 + Math.random() * 0.55), spread = (Math.random() - 0.5) * 3.2;
+    const big = j === 'bottom' ? 1 : 0.8;
+    emit(S.x + rx, S.y + ry, S.vx - S.w * ry + wx * sp - wy * spread, S.vy + S.w * rx + wy * sp + wx * spread, (0.45 + Math.random() * 0.5) * big, 0.62, 0.82, 1.0, 0);
+  }
+}
+function kickDust(jets, h) {
+  if (!jets.has('bottom')) return;
+  const p = nearestPlanet(S.x, S.y), L = landingState(p);
+  if (L.alt > 12 || Math.abs(L.tilt) > 50) return;
+  dustAcc += h * 90 * (1 - Math.max(0, L.alt) / 12);
+  const dx = S.x - p.x, dy = S.y - p.y, d = Math.hypot(dx, dy), nx = dx / d, ny = dy / d, tx = -ny, ty = nx;
+  const col = TYPES[p.type].dust;
+  while (dustAcc >= 1) {
+    dustAcc -= 1;
+    const side = Math.random() < 0.5 ? -1 : 1, off = (Math.random() - 0.5) * 2.2 * SC, vt = side * (3 + Math.random() * 6), vr = 1 + Math.random() * 3.5;
+    emit(p.x + nx * (p.R + 0.15) + tx * off, p.y + ny * (p.R + 0.15) + ty * off, tx * vt + nx * vr, ty * vt + ny * vr, 1.4 + Math.random() * 1.2, col[0], col[1], col[2], 1);
+  }
+}
+function step(h) {
+  if (S.started) S.t += h;
+  const req = activeJets();
+  const jets = S.fuel > 0 ? req : new Set();
+  S.active = jets;
+  if (jets.size) {
+    if (!S.started) S.started = true;
+    let use = 0; for (const j of jets) use += (j === 'ccw' || j === 'cw') ? FUEL_R : FUEL_T;
+    S.fuel = Math.max(0, S.fuel - use * h); S.fuelUsed += use * h;
+    if (S.fuel === 0) toast('Ar comprimido esgotado: a nave segue só por inércia e gravidade', 3200);
+  }
+  emitJets(jets, h);
+  kickDust(jets, h);
+
+  if (S.landed >= 0) return stepLanded(jets, h);
+
+  gravAt(S.x, S.y, gS);
+  const [tx, ty] = thrustWorld(jets);
+  S.vx += (gS.ax + tx) * h; S.vy += (gS.ay + ty) * h;
+  S.w += ((jets.has('ccw') ? 1 : 0) - (jets.has('cw') ? 1 : 0)) * ANG * h;
+  S.x += S.vx * h; S.y += S.vy * h; S.th = wrap(S.th + S.w * h);
+  if (S.noLand > 0) S.noLand -= h;
+  contacts();
+  if (state !== 'play') return;
+  const ox = Math.max(0, Math.abs(S.x) - VIEW.hw), oy = Math.max(0, Math.abs(S.y) - VIEW.hh), out = Math.hypot(ox, oy);
+  if (out > 3) returnToBase();
+}
+function stepLanded(jets, h) {
+  const p = planets[S.landed], a = S.landAng, nx = Math.cos(a), ny = Math.sin(a);
+  const k = Math.min(1, h * 12);
+  S.x += (p.x + nx * (p.R + FOOT) - S.x) * k; S.y += (p.y + ny * (p.R + FOOT) - S.y) * k;
+  S.th = wrap(S.th + wrap(a - Math.PI / 2 - S.th) * k);
+  S.vx = S.vy = S.w = 0;
+  if (jets.size) {
+    gravAt(S.x, S.y, gS);
+    const [tx, ty] = thrustWorld(jets);
+    const net = (tx + gS.ax) * nx + (ty + gS.ay) * ny;
+    if (net > 0.05) {   // empuxo vence o peso: decola
+      S.landed = -1; S.noLand = 0.6; S.th = a - Math.PI / 2;
+      S.x = p.x + nx * (p.R + FOOT + 0.04); S.y = p.y + ny * (p.R + FOOT + 0.04);
+      S.vx = (tx + gS.ax) * h; S.vy = (ty + gS.ay) * h; S.drill = 0;
+      return;
+    }
+  }
+  if (p.base) { S.fuel = Math.min(100, S.fuel + 30 * h); return; }
+  if (!S.sampled.has(p.idx)) {
+    S.drill += h;
+    if (Math.random() < h * 20) { const t = (Math.random() - 0.5) * 2; const col = TYPES[p.type].dust; emit(p.x + nx * (p.R + 0.1) - ny * t, p.y + ny * (p.R + 0.1) + nx * t, nx * (1 + Math.random() * 2) - ny * t * 2, ny * (1 + Math.random() * 2) + nx * t * 2, 1.2, col[0], col[1], col[2], 1); }
+    if (S.drill >= DRILL_T) collect(p);
+  }
+}
+function contacts() {
+  const c = Math.cos(S.th), s = Math.sin(S.th);
+  for (const p of planets) {
+    if (Math.hypot(S.x - p.x, S.y - p.y) > p.R + 2.8 * SC) continue;
+    const list = [];
+    for (let k = 0; k < HULL.length; k++) {
+      const rx = HULL[k][0] * c - HULL[k][1] * s, ry = HULL[k][0] * s + HULL[k][1] * c;
+      const dx = S.x + rx - p.x, dy = S.y + ry - p.y, d = Math.hypot(dx, dy);
+      if (d < p.R) list.push({ k, rx, ry, nx: dx / d, ny: dy / d, pen: p.R - d });
+    }
+    if (!list.length) continue;
+    const L = landingState(p), legsOnly = list.every(q => q.k < 2);
+    if (legsOnly && S.noLand <= 0 && L.ok) return land(p);
+    let maxImp = 0, hullImp = 0;
+    for (const q of list) {
+      const imp = -((S.vx - S.w * q.ry) * q.nx + (S.vy + S.w * q.rx) * q.ny);
+      if (imp > maxImp) maxImp = imp;
+      if (q.k >= 2 && imp > hullImp) hullImp = imp;
+    }
+    if (maxImp > CRASH_V) return crash(p, `Impacto a ${fmt(maxImp, 1)} m/s em ${p.n}. A estrutura aguenta até ${fmt(CRASH_V, 0)} m/s. A gravidade acelera a queda o tempo todo: comece a frear com S bem antes do solo.`);
+    if (hullImp > HULL_CRASH) return crash(p, `O casco tocou o solo de ${p.n} a ${fmt(hullImp, 1)} m/s. Só os pés aguentam o contato: alinhe a nave com a vertical local (inclinação ± 10°) antes de descer.`);
+    list.sort((a, b) => b.pen - a.pen);
+    for (let it = 0; it < 2; it++) for (const q of list) {
+      const vn = (S.vx - S.w * q.ry) * q.nx + (S.vy + S.w * q.rx) * q.ny;
+      if (vn >= 0) continue;
+      const e = vn < -0.8 ? 0.3 : 0, rn = q.rx * q.ny - q.ry * q.nx;
+      const jn = -(1 + e) * vn / (1 + rn * rn / I_SHIP);
+      S.vx += jn * q.nx; S.vy += jn * q.ny; S.w += rn * jn / I_SHIP;
+      const tx = -q.ny, ty = q.nx, vt = (S.vx - S.w * q.ry) * tx + (S.vy + S.w * q.rx) * ty, rt = q.rx * ty - q.ry * tx;
+      let jt = -vt / (1 + rt * rt / I_SHIP); const mx = 0.6 * jn; jt = Math.max(-mx, Math.min(mx, jt));
+      S.vx += jt * tx; S.vy += jt * ty; S.w += rt * jt / I_SHIP;
+    }
+    const q0 = list[0]; S.x += q0.nx * q0.pen; S.y += q0.ny * q0.pen;
+    if (maxImp > 0.9) {
+      thud(maxImp);
+      if (!legsOnly) toast('Pouso recusado: o casco tocou o solo. Só os pés podem encostar.', 2200);
+      else {
+        const why = [];
+        if (!L.ok1) why.push(`descida ${fmt(-L.vr, 1)} m/s`);
+        if (!L.ok2) why.push(`deriva ${fmt(Math.abs(L.vt), 1)} m/s`);
+        if (!L.ok3) why.push(`inclinação ${fmt(Math.abs(L.tilt), 0)}°`);
+        if (!L.ok4) why.push(`rotação ${fmt(Math.abs(L.w), 0)} °/s`);
+        if (why.length) toast('Pouso duro, a nave quicou: ' + why.join(', '), 2200);
+      }
+    }
+  }
+}
+function returnToBase() {   // saiu da tela: a nave volta pousada ao planeta de origem; amostras coletadas são mantidas
+  const base = planets.find(p => p.base);
+  S.landed = base.idx; S.landAng = LEVELS[levelIdx].start * Math.PI / 180;
+  S.x = base.x + Math.cos(S.landAng) * (base.R + FOOT); S.y = base.y + Math.sin(S.landAng) * (base.R + FOOT); S.th = S.landAng - Math.PI / 2;
+  S.vx = S.vy = S.w = 0; S.drill = 0; S.noLand = 0;
+  beep(440, 0.12, 'triangle', 0.08); setTimeout(() => beep(330, 0.18, 'triangle', 0.08), 110);
+  toast(`A nave saiu da tela e voltou para ${base.n}`, 2600);
+}
+function land(p) {
+  S.landed = p.idx; S.landAng = Math.atan2(S.y - p.y, S.x - p.x); S.vx = S.vy = S.w = 0; S.drill = 0; S.landings++;
+  const nx = Math.cos(S.landAng), ny = Math.sin(S.landAng), col = TYPES[p.type].dust;
+  for (let i = 0; i < 46; i++) {
+    const side = i % 2 ? 1 : -1, vt = side * (2 + Math.random() * 5), vr = 0.5 + Math.random() * 2.5, off = side * (0.8 + Math.random() * 1.2) * SC;
+    emit(p.x + nx * (p.R + 0.1) - ny * off, p.y + ny * (p.R + 0.1) + nx * off, -ny * vt + nx * vr, nx * vt + ny * vr, 1.2 + Math.random(), col[0], col[1], col[2], 1);
+  }
+  beep(660, 0.12, 'sine', 0.09); setTimeout(() => beep(880, 0.16, 'sine', 0.09), 110);
+  if (p.base) toast(`Pouso na base ${p.n}: recarregando o ar comprimido`, 2200, true);
+  else if (S.sampled.has(p.idx)) toast(`Amostra de ${p.n} já coletada. Siga para o próximo planeta.`, 2400);
+  else toast(`Pouso confirmado em ${p.n}. Coletando amostra…`, 2000, true);
+}
+function collect(p) {
+  S.sampled.add(p.idx); S.fuel = 100; plantFlag(p, S.landAng + (1.45 * SC + 0.9) / p.R);
+  const left = targetsOf().length - S.sampled.size;
+  beep(523, 0.14, 'sine', 0.1); setTimeout(() => beep(784, 0.22, 'sine', 0.1), 130);
+  if (left === 0) { toast(`Amostra de ${p.n} coletada. Setor concluído!`, 3000, true); state = 'complete'; endTimer = 2.0; }
+  else toast(`Amostra de ${p.n} coletada · tanque cheio · falta${left > 1 ? 'm' : ''} ${left}`, 2800, true);
+}
+function crash(p, msg) {
+  S.crashMsg = msg; state = 'crash'; endTimer = 2.2; ship.visible = false; S.active = new Set();
+  for (let i = 0; i < 360; i++) {
+    const a = Math.random() * Math.PI * 2, sp = 2 + Math.random() * 13, hot = Math.random() < 0.6;
+    emit(S.x, S.y, S.vx * 0.3 + Math.cos(a) * sp, S.vy * 0.3 + Math.sin(a) * sp, 1.2 + Math.random() * 1.8, hot ? 1.0 : 0.55, hot ? 0.55 : 0.62, hot ? 0.2 : 0.75, 2);
+  }
+  flash.position.set(S.x, S.y, 1); flashT = 1; boom();
+}
+
+// ================================================================ HUD
+const tele = { v: $('tV'), alt: $('tAlt'), vr: $('tVr'), vt: $('tVt'), tilt: $('tTilt'), w: $('tW'), g: $('tG'), gsrc: $('tGsrc'), f: $('tF'), bar: $('fBar') };
+const crit = [1, 2, 3, 4].map(i => ({ row: $('c' + i), val: $('v' + i) }));
+const readyEl = $('ready'), critFor = $('critFor'), keyEls = [...document.querySelectorAll('.key')];
+const toastEl = $('toast');
+let toastTimer = 0, lastToast = '';
+function toast(msg, ms = 2200, good = false) {
+  if (msg === lastToast && toastEl.classList.contains('show')) { clearTimeout(toastTimer); toastTimer = setTimeout(() => { toastEl.classList.remove('show'); lastToast = ''; }, ms); return; }
+  lastToast = msg; toastEl.textContent = msg; toastEl.classList.toggle('good', good); toastEl.classList.add('show');
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => { toastEl.classList.remove('show'); lastToast = ''; }, ms);
+}
+let hudT = 0;
+function updateHUD(dt) {
+  hudT -= dt;
+  const shown = state === 'play' && !paused ? S.active : new Set();
+  for (const k of keyEls) k.classList.toggle('on', shown.has(k.dataset.jet));
+  if (hudT > 0) return; hudT = 1 / 15;
+  const lv = LEVELS[levelIdx];
+  $('mSector').textContent = `Setor ${levelIdx + 1} de ${LEVELS.length}`;
+  $('mName').textContent = lv.name;
+  const tg = targetsOf().length;
+  $('mSamples').innerHTML = `<em>${S.sampled.size}</em>/${tg}`;
+  const t = Math.floor(S.t); $('mClock').textContent = `${String(Math.floor(t / 60)).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}`;
+
+  const p = nearestPlanet(S.x, S.y), L = landingState(p);
+  gravAt(S.x, S.y, gS);
+  tele.v.textContent = fmt(Math.hypot(S.vx, S.vy), 2) + ' m/s';
+  tele.alt.textContent = S.landed >= 0 ? 'no solo' : fmt(Math.max(0, L.alt), 1) + ' m';
+  tele.vr.textContent = fmt(L.vr, 2, true) + ' m/s';
+  tele.vt.textContent = fmt(L.vt, 2, true) + ' m/s';
+  tele.tilt.textContent = fmt(L.tilt, 1, true) + '°';
+  tele.w.textContent = fmt(L.w, 0, true) + ' °/s';
+  tele.g.textContent = fmt(gS.mag, 2) + ' m/s²';
+  tele.gsrc.textContent = gS.src >= 0 ? planets[gS.src].n : 'nenhum';
+  tele.gsrc.classList.toggle('warn', gS.src < 0);
+  tele.f.textContent = Math.round(S.fuel) + '%';
+  tele.bar.style.width = S.fuel + '%';
+  tele.bar.style.background = S.fuel < 20 ? 'var(--bad)' : S.fuel < 45 ? 'var(--amber)' : 'var(--cyan)';
+
+  critFor.textContent = p.n;
+  const vals = [fmt(Math.max(0, -L.vr), 2), fmt(Math.abs(L.vt), 2), fmt(L.tilt, 1, true) + '°', fmt(Math.abs(L.w), 0)];
+  const oks = [L.ok1, L.ok2, L.ok3, L.ok4];
+  const landed = S.landed >= 0;
+  crit.forEach((c, i) => { c.val.textContent = landed ? '–' : vals[i]; c.row.classList.toggle('ok', landed || oks[i]); });
+  readyEl.classList.remove('ok', 'idle');
+  if (landed) {
+    const lp = planets[S.landed];
+    readyEl.classList.add('ok');
+    readyEl.textContent = lp.base ? (S.fuel < 99.5 ? 'NA BASE · RECARREGANDO' : 'NA BASE · TANQUE CHEIO') : S.sampled.has(lp.idx) ? 'NO SOLO · AMOSTRA OK' : `COLETANDO ${Math.min(100, Math.round(S.drill / DRILL_T * 100))}%`;
+  } else if (L.alt > 30) { readyEl.classList.add('idle'); readyEl.textContent = 'LONGE DO SOLO'; }
+  else if (L.ok) { readyEl.classList.add('ok'); readyEl.textContent = 'PRONTO PARA POUSO'; }
+  else readyEl.textContent = 'FORA DOS LIMITES DE POUSO';
+
+  for (const pl of planets) {
+    let cls = 'tgt', st = `alvo · g ${fmt(pl.g, 1)} m/s²`;
+    if (pl.base) { cls = 'base'; st = `base · g ${fmt(pl.g, 1)} m/s²`; }
+    else if (S.sampled.has(pl.idx)) { cls = 'done'; st = '✓ amostra coletada'; }
+    else if (S.landed === pl.idx) st = `coletando ${Math.min(100, Math.round(S.drill / DRILL_T * 100))}%`;
+    const key = cls + st;
+    if (key !== pl.labelKey) { pl.labelKey = key; pl.label.className = 'plabel ' + cls; pl.labelSt.textContent = st; }
+  }
+}
+
+// ================================================================ visual por quadro
+const tmpV = new THREE.Vector3();
+function toScreen(x, y, z = 0) {
+  tmpV.set(x, y, z).project(camera);
+  return [(tmpV.x + 1) / 2 * innerWidth, (1 - tmpV.y) / 2 * innerHeight];
+}
+function updateVisuals(dt) {
+  if (state === 'lost' && dt > 0) { S.x += S.vx * dt; S.y += S.vy * dt; S.th += S.w * dt; }
+  ship.position.set(S.x, S.y, 0); ship.rotation.z = S.th;
+  for (const p of planets) {
+    p.mesh.rotation.y += p.spin * dt;
+    const inside = Math.hypot(S.x - p.x, S.y - p.y) <= p.R * RANGE && state !== 'crash';
+    p.ring.material.opacity += ((inside ? 0.75 : 0.28) - p.ring.material.opacity) * Math.min(1, dt * 6);
+    p.disc.material.opacity += ((inside ? 0.95 : 0.5) - p.disc.material.opacity) * Math.min(1, dt * 6);
+  }
+  updateParticles(dt);
+  if (flashT > 0) { flashT = Math.max(0, flashT - dt * 1.4); flash.material.opacity = flashT; flash.scale.setScalar(8 + (1 - flashT) * 30); }
+  // trajetória prevista: só gravidade, sem jatos
+  const flying = S.landed < 0 && state === 'play' && ship.visible;
+  predLine.visible = assist && flying;
+  if (predLine.visible) {
+    const arr = predGeo.attributes.position.array, hh = 1 / 24;
+    let x = S.x, y = S.y, vx = S.vx, vy = S.vy, n = 0, stop = false;
+    for (; n < PRED_N; n++) {
+      arr[n * 3] = x; arr[n * 3 + 1] = y; arr[n * 3 + 2] = 0.3;
+      if (stop) { n++; break; }
+      for (let sub = 0; sub < 2; sub++) {
+        gravAt(x, y, gP); vx += gP.ax * hh / 2; vy += gP.ay * hh / 2; x += vx * hh / 2; y += vy * hh / 2;
+      }
+      for (const p of planets) if (Math.hypot(x - p.x, y - p.y) < p.R + FOOT * 0.6) stop = true;
+      if (Math.abs(x) > VIEW.hw + 30 || Math.abs(y) > VIEW.hh + 30) stop = true;
+    }
+    for (let i = n; i < PRED_N; i++) { arr[i * 3] = arr[(n - 1) * 3]; arr[i * 3 + 1] = arr[(n - 1) * 3 + 1]; arr[i * 3 + 2] = 0.3; }
+    predGeo.attributes.position.needsUpdate = true; predLine.computeLineDistances();
+  }
+  gravAt(S.x, S.y, gS);
+  gArrow.visible = assist && flying && gS.mag > 0.01;
+  if (gArrow.visible) {
+    const len = 1.5 + gS.mag * 1.6;
+    gArrow.position.set(S.x, S.y, 2.5);
+    gArrow.setDirection(tmpV.set(gS.ax / gS.mag, gS.ay / gS.mag, 0));
+    gArrow.setLength(len, 0.9, 0.6);
+  }
+  // câmera: leve paralaxe com a posição da nave (2,5D)
+  camera.position.set(camBase.x + S.x * 0.015, camBase.y + S.y * 0.015, camBase.z);
+  camera.lookAt(camBase.x + S.x * 0.012, camBase.y + S.y * 0.012, 0);
+  camera.updateMatrixWorld();
+  for (const p of planets) {
+    const [sx, sy] = toScreen(p.x, p.y - p.R - 1.0, 0);
+    p.label.style.transform = `translate(${sx}px, ${sy}px) translate(-50%, 0)`;
+  }
+}
+
+// ================================================================ layout e câmera
+function resize() {
+  const vw = innerWidth, vh = innerHeight;
+  renderer.setSize(vw, vh, false);
+  camera.aspect = vw / vh; camera.updateProjectionMatrix();
+  const k = Math.max(FIT_W / vw, FIT_H / vh);   // a área do setor cabe inteira; o resto da tela também é espaço jogável
+  camBase.x = 0; camBase.y = 0;
+  camBase.z = vh * k / (2 * Math.tan(FOV / 2 * Math.PI / 180));
+  VIEW.hw = vw * k / 2; VIEW.hh = vh * k / 2;
+}
+window.addEventListener('resize', resize);
+
+// ================================================================ som
+let audio = null;
+function initAudio() {
+  if (audio) { if (audio.ac.state === 'suspended') audio.ac.resume(); return; }
+  try {
+    const ac = new (window.AudioContext || window.webkitAudioContext)();
+    const buf = ac.createBuffer(1, ac.sampleRate * 2, ac.sampleRate), ch = buf.getChannelData(0);
+    for (let i = 0; i < ch.length; i++) ch[i] = Math.random() * 2 - 1;
+    const src = ac.createBufferSource(); src.buffer = buf; src.loop = true;
+    const bp = ac.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 2200; bp.Q.value = 0.7;
+    const gain = ac.createGain(); gain.gain.value = 0;
+    src.connect(bp); bp.connect(gain); gain.connect(ac.destination); src.start();
+    audio = { ac, gain, buf };
+  } catch (e) { audio = null; }
+}
+function beep(f, dur, type = 'sine', vol = 0.1, f2) {
+  if (!audio || muted) return;
+  const ac = audio.ac, o = ac.createOscillator(), g = ac.createGain(), t = ac.currentTime;
+  o.type = type; o.frequency.setValueAtTime(f, t); if (f2) o.frequency.exponentialRampToValueAtTime(f2, t + dur);
+  g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.connect(g); g.connect(ac.destination); o.start(t); o.stop(t + dur + 0.02);
+}
+let lastThud = 0;
+function thud(v) {
+  if (!audio || muted || performance.now() - lastThud < 150) return; lastThud = performance.now();
+  beep(120, 0.18, 'sine', Math.min(0.25, 0.05 + v * 0.04), 60);
+}
+function boom() {
+  if (!audio || muted) return;
+  const ac = audio.ac, s = ac.createBufferSource(), lp = ac.createBiquadFilter(), g = ac.createGain(), t = ac.currentTime;
+  s.buffer = audio.buf; lp.type = 'lowpass'; lp.frequency.setValueAtTime(900, t); lp.frequency.exponentialRampToValueAtTime(80, t + 1.4);
+  g.gain.setValueAtTime(0.5, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 1.6);
+  s.connect(lp); lp.connect(g); g.connect(ac.destination); s.start(t); s.stop(t + 1.7);
+}
+
+// ================================================================ telas
+const overlay = $('overlay'), card = $('card');
+function esc(s) { return String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+function renderIntro() {
+  card.innerHTML = `
+    <h1>Rota das <span>Amostras</span></h1>
+    <p class="sub">Física newtoniana · jatos de ar comprimido · gravidade com alcance</p>
+    <p>Pilote a nave de planeta em planeta. Pouse em cada alvo, espere a coleta da amostra e siga para o próximo. Coletar uma amostra enche o tanque de ar; pousar na base também recarrega.</p>
+    <div class="formula">Cada planeta puxa com <b>g(r) = g<sub>s</sub> · (R / r)²</b>, onde g<sub>s</sub> é a gravidade na superfície. O puxão só existe até <b>r = 1,5 × diâmetro</b> (3 raios), marcado pelo anel tracejado; fora dele, nenhuma força. Onde dois campos se sobrepõem, as gravidades se somam. A gravidade age sobre a nave e sobre o gás, a poeira e os destroços, mas não move os planetas.</div>
+    <ul>
+      <li><b>S</b>: jato na base, empurra a nave para onde o nariz aponta (é ele que vence a gravidade)</li>
+      <li><b>W</b>: jato no topo, empurra para trás · <b>A / D</b>: jatos laterais</li>
+      <li><b>Q / E</b>: par de jatos que gira a nave; a rotação também tem inércia</li>
+      <li>Se a nave sair da tela, ela volta pousada ao planeta de origem; as amostras já coletadas continuam valendo</li>
+      <li>Pouse só com os pés: descida ≤ 2,5 m/s, deriva ≤ 1,5 m/s, inclinação ± 10° em relação à vertical local, rotação ≤ 15 °/s</li>
+      <li>A linha laranja mostra a trajetória que a gravidade dá à nave se você não disparar nada; a seta azul, a gravidade local</li>
+      <li><b>Menu</b> (canto inferior direito ou tecla <b>C</b>): botões dos jatos para toque, trajetória, som, pausa e setores</li>
+    </ul>
+    <div class="secs" role="group" aria-label="Escolha o setor">${LEVELS.map((l, i) => `<button class="sec" data-sec="${i}" aria-pressed="${i === selIdx}"><small>Setor ${i + 1} · ${l.planets.length - 1} alvo${l.planets.length > 2 ? 's' : ''}</small><b>${esc(l.name)}</b></button>`).join('')}</div>
+    <div class="acts"><button class="cta" id="bStart">Iniciar setor ${selIdx + 1}</button></div>`;
+  card.querySelectorAll('.sec').forEach(b => b.addEventListener('click', () => {
+    selIdx = +b.dataset.sec;
+    card.querySelectorAll('.sec').forEach(x => x.setAttribute('aria-pressed', String(+x.dataset.sec === selIdx)));
+    $('bStart').textContent = `Iniciar setor ${selIdx + 1}`;
+    resetLevel(selIdx);
+  }));
+  $('bStart').addEventListener('click', () => startLevel(selIdx));
+}
+function renderEnd(kind) {
+  const lv = LEVELS[levelIdx], last = levelIdx === LEVELS.length - 1;
+  const t = Math.floor(S.t), time = `${String(Math.floor(t / 60)).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}`;
+  const stats = `<div class="stats"><div><span>Tempo</span><b>${time}</b></div><div><span>Amostras</span><b>${S.sampled.size}/${targetsOf().length}</b></div><div><span>Ar consumido</span><b>${Math.round(S.fuelUsed)}%</b></div><div><span>Pousos</span><b>${S.landings}</b></div></div>`;
+  let h1, sub, text, primary;
+  if (kind === 'complete') {
+    h1 = last ? 'Campanha <span>concluída</span>' : 'Setor <span>concluído</span>';
+    sub = `Setor ${levelIdx + 1} · ${lv.name}`;
+    text = last ? 'Você coletou amostras de todos os planetas dos cinco setores. Tente de novo gastando menos ar: rotas que caem pelos poços gravitacionais economizam jatos.' : `Próximo: <b>${esc(LEVELS[levelIdx + 1].name)}</b>. ${esc(LEVELS[levelIdx + 1].desc)}`;
+    primary = last ? ['Recomeçar do setor 1', 0] : [`Ir para o setor ${levelIdx + 2}`, levelIdx + 1];
+  } else {
+    h1 = kind === 'lost' ? 'Perdida no <span>espaço</span>' : 'Nave <span>destruída</span>';
+    sub = `Setor ${levelIdx + 1} · ${lv.name}`;
+    text = esc(S.crashMsg);
+    primary = ['Tentar de novo', levelIdx];
+  }
+  card.innerHTML = `<h1>${h1}</h1><p class="sub">${esc(sub)}</p><p>${text}</p>${stats}<div class="acts"><button class="cta" id="bPrimary">${esc(primary[0])}</button><button class="ghost" id="bSectors">Escolher setor</button></div>`;
+  $('bPrimary').addEventListener('click', () => startLevel(primary[1]));
+  $('bSectors').addEventListener('click', openMenu);
+}
+function showEnd(kind) { state = 'end'; renderEnd(kind); overlay.hidden = false; setTimeout(() => $('bPrimary') && $('bPrimary').focus(), 30); }
+function openMenu() { selIdx = levelIdx; state = 'intro'; paused = false; toastEl.classList.remove('show'); resetLevel(selIdx); renderIntro(); overlay.hidden = false; }
+function startLevel(li) { initAudio(); selIdx = li; resetLevel(li); state = 'play'; paused = false; overlay.hidden = true; toast(`Setor ${li + 1} · ${LEVELS[li].name}: ${LEVELS[li].desc}`, 4200); }
+function togglePause() { if (state !== 'play') return; paused = !paused; toast(paused ? 'Pausa · P para continuar' : 'Continuando', paused ? 600000 : 900); }
+function setAssist(v) { assist = v; $('bAssist').setAttribute('aria-pressed', String(v)); $('assistSt').textContent = v ? 'ligada' : 'desligada'; }
+function setSound(v) { muted = !v; $('bSound').setAttribute('aria-pressed', String(v)); $('soundSt').textContent = v ? 'ligado' : 'desligado'; }
+$('bAssist').addEventListener('click', () => setAssist(!assist));
+$('bPause').addEventListener('click', togglePause);
+$('bSound').addEventListener('click', () => { initAudio(); setSound(muted); });
+$('bReset').addEventListener('click', () => startLevel(levelIdx));
+$('bMenu').addEventListener('click', () => { setDrawer(false); openMenu(); });
+const drawer = $('drawer'), menuBtn = $('menuBtn');
+function setDrawer(v) { drawer.hidden = !v; menuBtn.setAttribute('aria-expanded', String(v)); }
+menuBtn.addEventListener('click', () => setDrawer(drawer.hidden));
+let panelsOn = true;
+function setPanels(v) { panelsOn = v; $('tele').classList.toggle('off', !v); $('crit').classList.toggle('off', !v); $('bPanels').setAttribute('aria-pressed', String(v)); $('panelsSt').textContent = v ? 'visíveis' : 'ocultos'; }
+$('bPanels').addEventListener('click', () => setPanels(!panelsOn));
+
+// ================================================================ entrada
+window.addEventListener('keydown', e => {
+  if (KEYMAP[e.code]) { if (state === 'play') { input.keys.add(e.code); initAudio(); } e.preventDefault(); return; }
+  if (e.code === 'KeyT') setAssist(!assist);
+  else if (e.code === 'KeyC') setDrawer(drawer.hidden);
+  else if (e.code === 'KeyH') setPanels(!panelsOn);
+  else if (e.code === 'KeyP') togglePause();
+  else if (e.code === 'KeyM') { initAudio(); setSound(muted); }
+  else if (e.code === 'KeyR' && state !== 'intro') startLevel(levelIdx);
+  else if (e.code === 'Escape') { if (!drawer.hidden) setDrawer(false); else if (overlay.hidden) openMenu(); }
+  else if ((e.code === 'Enter' || e.code === 'Space') && !overlay.hidden && !(document.activeElement && document.activeElement.tagName === 'BUTTON')) { e.preventDefault(); startLevel(state === 'end' && S.sampled.size === targetsOf().length && levelIdx < LEVELS.length - 1 ? levelIdx + 1 : selIdx); }
+});
+window.addEventListener('keyup', e => input.keys.delete(e.code));
+window.addEventListener('blur', () => { input.keys.clear(); input.pad.clear(); input.pointer = null; });
+
+function jetFromScreen(px, py) {
+  const [sx, sy] = toScreen(S.x, S.y, 0);
+  const dx = px - sx, dy = -(py - sy);
+  if (Math.hypot(dx, dy) < 22) return null;
+  const c = Math.cos(S.th), s = Math.sin(S.th);
+  const bx = dx * c + dy * s, by = -dx * s + dy * c; // direção do clique no referencial da nave
+  return Math.abs(bx) > Math.abs(by) ? (bx > 0 ? 'right' : 'left') : (by > 0 ? 'top' : 'bottom');
+}
+canvas.addEventListener('pointerdown', e => {
+  if (state !== 'play') return;
+  initAudio(); canvas.setPointerCapture(e.pointerId);
+  input.pointer = { id: e.pointerId, x: e.clientX, y: e.clientY, jet: jetFromScreen(e.clientX, e.clientY) };
+});
+canvas.addEventListener('pointermove', e => { if (input.pointer && input.pointer.id === e.pointerId) { input.pointer.x = e.clientX; input.pointer.y = e.clientY; } });
+const endPointer = e => { if (input.pointer && input.pointer.id === e.pointerId) input.pointer = null; };
+canvas.addEventListener('pointerup', endPointer); canvas.addEventListener('pointercancel', endPointer);
+canvas.addEventListener('contextmenu', e => e.preventDefault());
+for (const k of keyEls) {
+  const j = k.dataset.jet;
+  k.addEventListener('pointerdown', e => { e.preventDefault(); initAudio(); k.setPointerCapture(e.pointerId); if (state === 'play') input.pad.add(j); });
+  const up = () => input.pad.delete(j);
+  k.addEventListener('pointerup', up); k.addEventListener('pointercancel', up); k.addEventListener('lostpointercapture', up);
+  k.addEventListener('keydown', e => { if (e.code === 'Space' || e.code === 'Enter') { e.preventDefault(); e.stopPropagation(); if (state === 'play') input.pad.add(j); } });
+  k.addEventListener('keyup', e => { if (e.code === 'Space' || e.code === 'Enter') input.pad.delete(j); });
+}
+
+// ================================================================ laço principal
+const H = 1 / 120;
+let last = performance.now(), acc = 0;
+function frame(now) {
+  const dt = Math.min(0.1, (now - last) / 1000); last = now;
+  if (state === 'play' && !paused) {
+    if (input.pointer) input.pointer.jet = jetFromScreen(input.pointer.x, input.pointer.y);
+    acc += dt;
+    while (acc >= H && state === 'play') { step(H); acc -= H; }
+  } else { acc = 0; if (state !== 'play') S.active = new Set(); }
+  if ((state === 'crash' || state === 'lost' || state === 'complete') && !paused) { endTimer -= dt; if (endTimer <= 0) showEnd(state); }
+  if (audio) {
+    const n = (state === 'play' && !paused) ? S.active.size : 0;
+    audio.gain.gain.setTargetAtTime(muted ? 0 : Math.min(0.16, n * 0.055), audio.ac.currentTime, 0.03);
+  }
+  const vdt = paused ? 0 : dt;
+  updateVisuals(vdt);
+  updateHUD(dt);
+  renderer.render(scene, camera);
+  requestAnimationFrame(frame);
+}
+resetLevel(0);
+renderIntro();
+resize();
+requestAnimationFrame(frame);
+})();
+</script>
+
+</body></html>
